@@ -88,7 +88,62 @@ public class PdfPkcs1Service {
     // [PT-BR] Lista de caminhos de imagem de assinatura separados por vírgula
     // [ES]    Lista de rutas de imagen de firma separadas por coma
     @Value("${solidsign.sig.signatureImagePaths}")
+
     private List<String> signatureImagePaths;
+
+    // [EN]    Reason for signing — displayed in the PDF signature properties
+    // [PT-BR] Motivo da assinatura — exibido nas propriedades da assinatura PDF
+    // [ES]    Motivo de la firma — se muestra en las propiedades de la firma PDF
+    @Value("${solidsign.sig.reason}")
+    private String reason;
+
+    // [EN]    Signing location — displayed in the PDF signature properties
+    // [PT-BR] Local da assinatura — exibido nas propriedades da assinatura PDF
+    // [ES]    Lugar de firma — se muestra en las propiedades de la firma PDF
+    @Value("${solidsign.sig.location}")
+    private String location;
+
+    // [EN]    Contact information of the signer — displayed in the PDF signature properties
+    // [PT-BR] Informações de contato do assinante — exibido nas propriedades da assinatura PDF
+    // [ES]    Información de contacto del firmante — se muestra en las propiedades de la firma PDF
+    @Value("${solidsign.sig.contact}")
+    private String contact;
+
+    // [EN]    Optional: name of a pre-existing signature field in the PDF to target
+    // [PT-BR] Opcional: nome de um campo de assinatura pré-existente no PDF a utilizar
+    // [ES]    Opcional: nombre de un campo de firma preexistente en el PDF
+    // @Value("${solidsign.sig.signatureFieldName:}")
+    // private String signatureFieldName;
+
+    // [EN]    Optional: text overlays as JSON array (pageNumber, coordinateX, coordinateY, text, fontSize, textColor)
+    // [PT-BR] Opcional: sobreposições de texto como array JSON (pageNumber, coordinateX, coordinateY, text, fontSize, textColor)
+    // [ES]    Opcional: superposiciones de texto como array JSON (pageNumber, coordinateX, coordinateY, text, fontSize, textColor)
+    // @Value("${solidsign.sig.signatureTextConfig:}")
+    // private String signatureTextConfig;
+
+    // [EN]    Optional: MDP permission level for certification signature (1=no changes, 2=forms, 3=annotations)
+    // [PT-BR] Opcional: nível de permissão MDP para assinatura de certificação (1=sem alterações, 2=formulários, 3=anotações)
+    // [ES]    Opcional: nivel de permiso MDP para firma de certificación (1=sin cambios, 2=formularios, 3=anotaciones)
+    // @Value("${solidsign.sig.mdpPermissionLevel:}")
+    // private String mdpPermissionLevel;
+
+    // [EN]    Optional: JSON array of per-document open passwords for encrypted PDFs (e.g. ["pwd1","pwd2",null])
+    // [PT-BR] Opcional: array JSON de senhas por documento para PDFs criptografados (ex: ["senha1","senha2",null])
+    // [ES]    Opcional: array JSON de contraseñas por documento para PDFs cifrados (p.ej. ["pwd1","pwd2",null])
+    // @Value("${solidsign.sig.passwordsForDecryption:}")
+    // private String passwordsForDecryption;
+
+    // [EN]    Optional: JSON map of PDF document metadata (title, author, subject, keywords, creator)
+    // [PT-BR] Opcional: mapa JSON de metadados do documento PDF (title, author, subject, keywords, creator)
+    // [ES]    Opcional: mapa JSON de metadatos del documento PDF (title, author, subject, keywords, creator)
+    // @Value("${solidsign.sig.documentInfoMetadata:}")
+    // private String documentInfoMetadata;
+
+    // [EN]    Optional: QR code config as JSON array — CANNOT be used together with signatureFieldConfig
+    // [PT-BR] Opcional: configuração de QR code como array JSON — NÃO pode ser usado junto com signatureFieldConfig
+    // [ES]    Opcional: configuración de código QR como array JSON — NO puede usarse junto con signatureFieldConfig
+    // @Value("${solidsign.sig.signatureQrCodeConfig:}")
+    // private String signatureQrCodeConfig;
 
     // [EN]    PEM body of the signer's public certificate (no BEGIN/END headers, no private key)
     // [PT-BR] Corpo PEM do certificado público do assinante (sem marcadores BEGIN/END, sem chave privada)
@@ -129,6 +184,20 @@ public class PdfPkcs1Service {
         body.add("hashAlgorithm",           hashAlgorithm);
         body.add("sigFieldMeasurementUnit", sigFieldMeasurementUnit);
         body.add("signatureFieldConfig",    signatureFieldConfig);
+        body.add("reason",                  reason);
+        body.add("location",                location);
+        body.add("contact",                 contact);
+
+        // [EN]    Optional parameters — uncomment to use
+        // [PT-BR] Parâmetros opcionais — descomente para usar
+        // [ES]    Parámetros opcionales — descomente para usar
+        // body.add("signatureFieldName",     signatureFieldName);
+        // body.add("signatureTextConfig",    signatureTextConfig);
+        // body.add("mdpPermissionLevel",     mdpPermissionLevel);
+        // body.add("passwordsForDecryption", passwordsForDecryption);
+        // body.add("documentInfoMetadata",   documentInfoMetadata);
+        // body.add("signatureQrCodeConfig",  signatureQrCodeConfig);
+
         // [EN]    Signer's certificate PEM body (no headers) — required by SolidSign to embed it in the signature
         // [PT-BR] Corpo PEM do certificado do assinante (sem marcadores) — obrigatório para SolidSign embutir na assinatura
         // [ES]    Cuerpo PEM del certificado del firmante (sin marcadores) — requerido por SolidSign para incluirlo en la firma
@@ -199,4 +268,114 @@ public class PdfPkcs1Service {
         }
         return null;
     }
+
+    // ─── Form endpoints (all params from request, properties ignored) ─────────
+
+    /**
+     * [EN]    Step 1 form variant for PAdES PKCS#1 — all config from caller.
+     *         signatureImages may be null/empty if no visual signature is needed.
+     * [PT-BR] Variante de formulário do passo 1 para PAdES PKCS#1 — toda config do chamador.
+     * [ES]    Variante de formulario del paso 1 para PAdES PKCS#1 — toda config del llamador.
+     */
+    public PreparedHashesResponse prepareForm(Map<String, String> params,
+                                              MultipartFile[] documents,
+                                              MultipartFile[] signatureImages) throws IOException {
+        String auth     = params.getOrDefault("authorization", "");
+        String apiBase  = params.getOrDefault("baseUrl", "");
+        String profile  = params.get("profile");
+        String hashAlg  = params.get("hashAlgorithm");
+        String policy   = params.get("policyVersion");
+        String sfMU     = params.get("sigFieldMeasurementUnit");
+        String sfConfig = params.get("signatureFieldConfig");
+        String reason   = params.get("reason");
+        String location = params.get("location");
+        String contact  = params.get("contact");
+        String sfName   = params.get("signatureFieldName");
+        String stConfig = params.get("signatureTextConfig");
+        String mdp      = params.get("mdpPermissionLevel");
+        String pwdDec   = params.get("passwordsForDecryption");
+        String docMeta  = params.get("documentInfoMetadata");
+        String qrCode   = params.get("signatureQrCodeConfig");
+        String cert     = params.get("certificate");
+
+        String prepUrl = apiBase + "/solidsign/dsig/pdf/pkcs1/sign-preparation";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("Authorization", auth);
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        for (int i = 0; i < documents.length; i++) {
+            final byte[] bytes = documents[i].getBytes();
+            final String name  = documents[i].getOriginalFilename();
+            body.add("document[" + i + "]", new ByteArrayResource(bytes) {
+                @Override public String getFilename() { return name; }
+            });
+        }
+        if (signatureImages != null) {
+            for (int i = 0; i < signatureImages.length; i++) {
+                final byte[] imgBytes = signatureImages[i].getBytes();
+                final String imgName  = signatureImages[i].getOriginalFilename();
+                body.add("signatureImage[" + i + "]", new ByteArrayResource(imgBytes) {
+                    @Override public String getFilename() { return imgName; }
+                });
+            }
+        }
+        if (profile  != null && !profile.isBlank())  body.add("profile",                 profile);
+        if (hashAlg  != null && !hashAlg.isBlank())  body.add("hashAlgorithm",           hashAlg);
+        if (policy   != null && !policy.isBlank())   body.add("policyVersion",           policy);
+        if (sfMU     != null && !sfMU.isBlank())     body.add("sigFieldMeasurementUnit", sfMU);
+        if (sfConfig != null && !sfConfig.isBlank()) body.add("signatureFieldConfig",    sfConfig);
+        if (reason   != null && !reason.isBlank())   body.add("reason",                  reason);
+        if (location != null && !location.isBlank()) body.add("location",                location);
+        if (contact  != null && !contact.isBlank())  body.add("contact",                 contact);
+        if (sfName   != null && !sfName.isBlank())   body.add("signatureFieldName",      sfName);
+        if (stConfig != null && !stConfig.isBlank()) body.add("signatureTextConfig",     stConfig);
+        if (mdp      != null && !mdp.isBlank())      body.add("mdpPermissionLevel",      mdp);
+        if (pwdDec   != null && !pwdDec.isBlank())   body.add("passwordsForDecryption",  pwdDec);
+        if (docMeta  != null && !docMeta.isBlank())  body.add("documentInfoMetadata",    docMeta);
+        if (qrCode   != null && !qrCode.isBlank())   body.add("signatureQrCodeConfig",   qrCode);
+        if (cert     != null && !cert.isBlank())     body.add("certificate",             cert);
+        try {
+            ResponseEntity<PreparedHashesResponse> resp = restTemplate.postForEntity(
+                    prepUrl, new HttpEntity<>(body, headers), PreparedHashesResponse.class);
+            if (resp.getStatusCode() == HttpStatus.OK) {
+                LOGGER.info("PDF PKCS1 form preparation OK. finalNonce={}", resp.getBody().finalNonce);
+                return resp.getBody();
+            }
+        } catch (HttpStatusCodeException e) {
+            LOGGER.error("SolidSign prep form error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            LOGGER.error("Unexpected error in PDF PKCS1 form preparation: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
+    /**
+     * [EN]    Step 2 form variant for PAdES PKCS#1 — auth and baseUrl from allParams map.
+     * [PT-BR] Variante de formulário do passo 2 para PAdES PKCS#1 — auth e baseUrl do map.
+     * [ES]    Variante de formulario del paso 2 para PAdES PKCS#1 — auth y baseUrl del map.
+     */
+    public SignResponse finalizeForm(Map<String, String> allParams) {
+        String auth       = allParams.remove("authorization");
+        String apiBaseUrl = allParams.remove("baseUrl");
+        String finalUrl   = apiBaseUrl + "/solidsign/dsig/pdf/pkcs1/sign-finalization";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("Authorization", auth);
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        allParams.forEach(body::add);
+        try {
+            ResponseEntity<SignResponse> resp = restTemplate.postForEntity(
+                    finalUrl, new HttpEntity<>(body, headers), SignResponse.class);
+            if (resp.getStatusCode() == HttpStatus.OK) {
+                LOGGER.info("PDF PKCS1 form finalization OK.");
+                return resp.getBody();
+            }
+        } catch (HttpStatusCodeException e) {
+            LOGGER.error("SolidSign final form error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            LOGGER.error("Unexpected error in PDF PKCS1 form finalization: {}", e.getMessage(), e);
+        }
+        return null;
+    }
+
 }

@@ -12,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * [EN]    REST controller for two-step PAdES (PDF) signing using PKCS#1 (external private key).
@@ -67,4 +69,39 @@ public class PdfPkcs1Controller {
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.internalServerError().build();
     }
+
+    /**
+     * [EN]    Step 1 form variant for React — PAdES PKCS#1. properties ignored.
+     * [PT-BR] Variante de formulário passo 1 para React — PAdES PKCS#1. properties ignorado.
+     * [ES]    Variante de formulario paso 1 para React — PAdES PKCS#1. properties ignorado.
+     */
+    @CrossOrigin
+    @PostMapping("/prepare/form")
+    public ResponseEntity<PreparedHashesResponse> prepareForm(
+            @RequestParam("document")                                    MultipartFile[] documents,
+            @RequestParam(value = "signatureImage", required = false)    MultipartFile[] signatureImages,
+            @RequestParam Map<String, String>                            allParams
+    ) throws IOException {
+        LOGGER.info("PDF PKCS1 form preparation for {} doc(s).", documents.length);
+        PreparedHashesResponse response = service.prepareForm(new java.util.HashMap<>(allParams), documents, signatureImages);
+        return response != null
+                ? ResponseEntity.ok(response)
+                : ResponseEntity.internalServerError().build();
+    }
+
+    /**
+     * [EN]    Step 2 form variant for React — PAdES PKCS#1. properties ignored.
+     * [PT-BR] Variante de formulário passo 2 para React — PAdES PKCS#1. properties ignorado.
+     * [ES]    Variante de formulario paso 2 para React — PAdES PKCS#1. properties ignorado.
+     */
+    @CrossOrigin
+    @PostMapping("/finalize/form")
+    public ResponseEntity<SignResponse> finalizeForm(@RequestParam Map<String, String> allParams) {
+        LOGGER.info("PDF PKCS1 form finalization. finalNonce={}", allParams.get("finalNonce"));
+        SignResponse response = service.finalizeForm(new java.util.HashMap<>(allParams));
+        return response != null
+                ? ResponseEntity.ok(response)
+                : ResponseEntity.internalServerError().build();
+    }
+
 }
